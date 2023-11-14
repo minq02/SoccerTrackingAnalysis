@@ -2,15 +2,18 @@ from ultralytics import YOLO
 import cv2
 import numpy as np
 
-video = 'videos/short.webm'
-weight_ball = 'models/s_1280_epoch1000.pt'
-weight_player = 'models/yolov8x.pt'
+video = '/Users/hyunwoo/Downloads/short.webm'
+weight_ball = 'n_soccer_1280_v5.pt'
+weight_player = 'models/yolov8s.pt'
+
+def find_distance(coord1, coord2):
+    return np.sqrt((coord1[0] - coord2[0])**2 + (coord1[1] - coord2[1])**2)
 
 model_ball = YOLO(weight_ball) 
 model_player = YOLO(weight_player)
 
-results_ball = model_ball.predict(video, stream=True, show=False, verbose=True, device=0, iou=0.1)  
-results_players = model_player.predict(video, stream=True, show=False, verbose=True, device=0, classes=0, iou=0.45)  
+results_ball = model_ball.predict(video, stream=True, show=False, verbose=True, device="mps", iou=0.1)  
+results_players = model_player.predict(video, stream=True, show=False, verbose=True, device="mps", classes=0, iou=0.45)  
 
 total_frames = 0
 detected_frames_balls = 0
@@ -26,6 +29,9 @@ upper_white = np.array([180, 40, 255])
 lower_red = np.array([0, 50, 50])
 upper_red = np.array([10, 255, 255])
 
+previous_frame_team = None
+possession = {"Spain": 0, "Portugal": 0}
+
 for result_ball, result_player in zip(results_ball, results_players):
     total_frames += 1
     
@@ -38,6 +44,12 @@ for result_ball, result_player in zip(results_ball, results_players):
 
     # Combine and display results from both models
     img = result_ball.orig_img.copy()  # Extract the original image
+    
+    #Calculate Possession
+    
+    closest_team = None
+    closest_distance = 100000
+    counter = 0
 
     # Draw boxes for soccer balls
     for box in result_ball.boxes.xyxy:
@@ -62,10 +74,28 @@ for result_ball, result_player in zip(results_ball, results_players):
         else:
             label = "Portugal"
             color = (0, 0, 255)  # Red color for Portugal
+        try:
+            ball = result_ball.boxes.xyxy[0]
+        except:
+            closet_team = previous_frame_team
+            continue
+        ball_coordinate = (int(ball[0] + ball[2])/2 , int(ball[1] + ball[3])/2) 
+        # Extract the bounding box coordinates
+        player_coordinate = (int(box[0] + box[2])/2 , int(box[1]))
 
+        if find_distance(ball_coordinate, player_coordinate) < closest_distance and label != "Referee":
+            closest_team = label
+            closest_distance = find_distance(ball_coordinate, player_coordinate)
+          
         cv2.rectangle(img, (x1, y1), (x2, y2), color, 2)
         cv2.putText(img, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 2)
-
+    if previous_frame_team != closest_team:
+        previous_frame_team = closest_team
+        counter = 1
+    elif counter < 5:
+        counter+= 1
+    else:
+        possession[closest_team] += 1
     # Display the image
     cv2.imshow('Combined Detections', img)
     
@@ -75,3 +105,4 @@ for result_ball, result_player in zip(results_ball, results_players):
     cv2.waitKey(1)  # Display each frame for a short duration
 
 cv2.destroyAllWindows()
+print(f'Possession: {possession}')
