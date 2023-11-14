@@ -59,7 +59,7 @@ for result_ball, result_player in zip(results_ball, results_players):
     # Draw boxes for players
     for box in result_player.boxes.xyxy:
         x1, y1, x2, y2 = int(box[0]) + 10, int(box[1])- 10, int(box[2]), int(box[3])
-        roi = img[y1:y2, x1:x2]
+        roi = img[y1:y2-20, x1:x2]
         hsv_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
 
         mask_yellow = cv2.inRange(hsv_roi, lower_yellow, upper_yellow)
@@ -91,7 +91,7 @@ for result_ball, result_player in zip(results_ball, results_players):
         cv2.rectangle(img, (x1, y1), (x2, y2), color, 2)
         cv2.putText(img, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 2)
     if closest_team is not None:
-        if previous_frame_team != closest_team:
+        if previous_frame_team != closest_team and closest_distance < 500:
             previous_frame_team = closest_team
             counter = 1
         else:
