@@ -31,6 +31,8 @@ upper_red = np.array([10, 255, 255])
 
 previous_frame_team = None
 possession = {"Spain": 0, "Portugal": 0}
+counter = 0
+
 
 for result_ball, result_player in zip(results_ball, results_players):
     total_frames += 1
@@ -47,9 +49,8 @@ for result_ball, result_player in zip(results_ball, results_players):
     
     #Calculate Possession
     
-    closest_team = None
     closest_distance = 100000
-    counter = 0
+    closest_team = None
 
     # Draw boxes for soccer balls
     for box in result_ball.boxes.xyxy:
@@ -78,31 +79,37 @@ for result_ball, result_player in zip(results_ball, results_players):
             ball = result_ball.boxes.xyxy[0]
         except:
             closet_team = previous_frame_team
-            continue
+            break
+
         ball_coordinate = (int(ball[0] + ball[2])/2 , int(ball[1] + ball[3])/2) 
         # Extract the bounding box coordinates
         player_coordinate = (int(box[0] + box[2])/2 , int(box[1]))
 
         if find_distance(ball_coordinate, player_coordinate) < closest_distance and label != "Referee":
             closest_team = label
-            closest_distance = find_distance(ball_coordinate, player_coordinate)
-          
+            closest_distance = find_distance(ball_coordinate, player_coordinate)          
         cv2.rectangle(img, (x1, y1), (x2, y2), color, 2)
         cv2.putText(img, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 2)
-    if previous_frame_team != closest_team:
-        previous_frame_team = closest_team
-        counter = 1
-    elif counter < 5:
-        counter+= 1
+    if closest_team is not None:
+        if previous_frame_team != closest_team:
+            previous_frame_team = closest_team
+            counter = 1
+        else:
+            counter += 1
+            if counter >= 60:
+                possession[closest_team] += 1
+                counter = 0  # Reset the counter after updating possession
     else:
-        possession[closest_team] += 1
+        if counter > 0 and previous_frame_team is not None:
+            possession[previous_frame_team] += 1
+        counter = 0  # Reset counter if closest_team is None
+    
+    print(possession['Portugal'], possession['Spain'])
+
     # Display the image
     cv2.imshow('Combined Detections', img)
     
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
-
     cv2.waitKey(1)  # Display each frame for a short duration
-
 cv2.destroyAllWindows()
-print(f'Possession: {possession}')
